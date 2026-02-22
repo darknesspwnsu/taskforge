@@ -5,6 +5,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo } fro
 import type {
   NotificationPreferences,
   PlannerCalendarEvent,
+  PlannerPreferences,
   PlannerSuggestion,
   TaskOccurrence,
 } from '../types/domain';
@@ -59,6 +60,7 @@ type TaskForgeContextValue = {
   setPlannerCalendarEvents: (events: PlannerCalendarEvent[]) => Promise<void>;
   importPlannerCalendarFromIcs: (icsUrl: string) => Promise<{ ok: boolean; message: string }>;
   generatePlannerSuggestions: (options?: { apiKey?: string; useAi?: boolean }) => Promise<void>;
+  updatePlannerSettings: (preferences: Partial<PlannerPreferences>) => Promise<void>;
   setOnboardingComplete: (completed: boolean) => Promise<void>;
   updateNotificationSettings: (preferences: Partial<NotificationPreferences>) => Promise<void>;
   flushQueue: () => Promise<void>;
@@ -367,6 +369,24 @@ export function TaskForgeProvider({ children }: { children: React.ReactNode }) {
     [queryClient, user],
   );
 
+  const updatePlannerSettings = useCallback(
+    async (preferences: Partial<PlannerPreferences>) => {
+      if (!user) {
+        return;
+      }
+
+      await persistNextSnapshot(queryClient, user.id, (current) =>
+        updateSettings(current, {
+          planner: {
+            ...current.settings.planner,
+            ...preferences,
+          },
+        }),
+      );
+    },
+    [queryClient, user],
+  );
+
   const flushQueue = useCallback(async () => {
     if (!user) {
       return;
@@ -468,6 +488,7 @@ export function TaskForgeProvider({ children }: { children: React.ReactNode }) {
       setPlannerCalendarEvents,
       importPlannerCalendarFromIcs,
       generatePlannerSuggestions,
+      updatePlannerSettings,
       setOnboardingComplete,
       updateNotificationSettings,
       flushQueue,
@@ -485,6 +506,7 @@ export function TaskForgeProvider({ children }: { children: React.ReactNode }) {
       skipOccurrence,
       snapshot,
       snapshotQuery.isPending,
+      updatePlannerSettings,
       updateNotificationSettings,
       upsertTask,
     ],

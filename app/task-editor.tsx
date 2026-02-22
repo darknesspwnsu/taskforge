@@ -39,6 +39,9 @@ export default function TaskEditorModal() {
   const [notes, setNotes] = useState(editingTask?.notes ?? '');
   const [effort, setEffort] = useState<TaskEffort>(editingTask?.effort ?? 'normal');
   const [manualXp, setManualXp] = useState(editingTask?.manualXp ? String(editingTask.manualXp) : '');
+  const [estimatedMinutes, setEstimatedMinutes] = useState(
+    editingTask?.estimatedMinutes ? String(editingTask.estimatedMinutes) : '',
+  );
   const [dueInput, setDueInput] = useState(editingTask?.dueAt ? editingTask.dueAt : '');
 
   const [recurrenceKind, setRecurrenceKind] = useState<'none' | 'interval_days' | 'weekly'>(
@@ -64,6 +67,7 @@ export default function TaskEditorModal() {
 
   const save = async () => {
     const parsedXp = manualXp.trim() ? Number(manualXp) : undefined;
+    const parsedEstimatedMinutes = estimatedMinutes.trim() ? Number(estimatedMinutes) : undefined;
     const dueAt = normalizeDueInput(dueInput);
 
     let recurrenceRule: RecurrenceRule | undefined;
@@ -89,6 +93,7 @@ export default function TaskEditorModal() {
       notes,
       effort,
       manualXp: Number.isFinite(parsedXp) ? parsedXp : undefined,
+      estimatedMinutes: Number.isFinite(parsedEstimatedMinutes) ? parsedEstimatedMinutes : undefined,
       dueAt,
       recurrenceRule,
       active: editingTask?.active ?? true,
@@ -210,6 +215,17 @@ export default function TaskEditorModal() {
             </View>
           </View>
         ) : null}
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Estimated minutes (optional)</Text>
+        <TextInput
+          value={estimatedMinutes}
+          onChangeText={setEstimatedMinutes}
+          keyboardType="number-pad"
+          style={styles.input}
+          placeholder="60"
+        />
       </View>
 
       <View style={styles.field}>

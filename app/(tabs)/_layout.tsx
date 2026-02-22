@@ -37,6 +37,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="planner"
+        options={{
+          title: 'Planner',
+          tabBarIcon: ({ color }) => <TabIcon name="clock-o" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="progress"
         options={{
           title: 'Progress',

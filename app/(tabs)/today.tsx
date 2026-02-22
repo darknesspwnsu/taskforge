@@ -7,6 +7,7 @@ import { OccurrenceCard } from '../../src/components/OccurrenceCard';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { ScreenContainer } from '../../src/components/ScreenContainer';
 import { useTaskForge } from '../../src/hooks/useTaskForge';
+import { getComplexTaskProgress } from '../../src/lib/taskEngine';
 import { xpThresholdForLevel } from '../../src/lib/xp';
 import { colors } from '../../src/theme/colors';
 import type { TaskEffort } from '../../src/types/domain';
@@ -49,6 +50,10 @@ export default function TodayScreen() {
 
   const taskById = useMemo(
     () => new Map((snapshot?.tasks ?? []).map((task) => [task.id, task])),
+    [snapshot?.tasks],
+  );
+  const complexParents = useMemo(
+    () => (snapshot?.tasks ?? []).filter((task) => task.taskKind === 'complex_parent'),
     [snapshot?.tasks],
   );
 
@@ -131,10 +136,36 @@ export default function TodayScreen() {
         </View>
 
         <PrimaryButton label="Add Task" onPress={createQuickTask} disabled={!title.trim()} />
-        <Link href="/task-editor" style={styles.openEditorLink}>
-          Open full editor
-        </Link>
+        <View style={styles.quickLinks}>
+          <Link href="/task-editor" style={styles.openEditorLink}>
+            Open full editor
+          </Link>
+          <Link href="/retro-log" style={styles.openEditorLink}>
+            Log completed task
+          </Link>
+          <Link href="/complex-task" style={styles.openEditorLink}>
+            Create complex task
+          </Link>
+          <Link href="/(tabs)/planner" style={styles.openEditorLink}>
+            Open planner
+          </Link>
+        </View>
       </View>
+
+      {complexParents.length > 0 ? <Text style={styles.sectionTitle}>Complex Objectives</Text> : null}
+      {complexParents.map((parent) => {
+        const progress = getComplexTaskProgress(snapshot!, parent.id);
+        const completion = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
+
+        return (
+          <View key={`complex-${parent.id}`} style={styles.feedItem}>
+            <Text style={styles.feedTitle}>{parent.title}</Text>
+            <Text style={styles.feedMeta}>
+              {progress.completed}/{progress.total} subtasks complete ({completion}%)
+            </Text>
+          </View>
+        );
+      })}
 
       <Text style={styles.sectionTitle}>Due now</Text>
       {(todayOccurrences.length === 0 ? [null] : todayOccurrences).map((occurrence, index) => {
@@ -252,8 +283,12 @@ const styles = StyleSheet.create({
     color: colors.brand,
     fontWeight: '700',
     fontSize: 13,
-    alignSelf: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  quickLinks: {
     marginTop: 4,
+    gap: 2,
   },
   emptyCard: {
     borderWidth: 1,

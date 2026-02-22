@@ -28,6 +28,8 @@ export default function RootLayout() {
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="task-editor" options={{ title: 'Task Editor', presentation: 'modal' }} />
+          <Stack.Screen name="retro-log" options={{ title: 'Retroactive Credit', presentation: 'modal' }} />
+          <Stack.Screen name="complex-task" options={{ title: 'Complex Task', presentation: 'modal' }} />
         </Stack>
       </ThemeProvider>
     </AppProviders>

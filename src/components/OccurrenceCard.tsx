@@ -32,7 +32,11 @@ export function OccurrenceCard({
       <View style={styles.rowTop}>
         <View style={styles.main}>
           <Text style={styles.title}>{task.title}</Text>
-          <Text style={styles.meta}>{dueText}</Text>
+          <Text style={styles.meta}>
+            {task.taskKind === 'subtask' ? 'Subtask · ' : ''}
+            {dueText}
+            {task.estimatedMinutes ? ` · ${task.estimatedMinutes} min` : ''}
+          </Text>
         </View>
         <View style={styles.xpPill}>
           <Text style={styles.xpPillText}>{baseXp} XP</Text>
