@@ -179,7 +179,7 @@ export function completeOccurrenceInSnapshot(
     item.id === occurrence.id
       ? {
           ...item,
-          status: 'completed',
+          status: 'completed' as const,
           completedAt: input.completedAt,
         }
       : item,
@@ -247,7 +247,7 @@ export function skipOccurrenceInSnapshot(
     item.id === occurrence.id
       ? {
           ...item,
-          status: 'skipped',
+          status: 'skipped' as const,
           skippedAt: input.skippedAt,
           skipReason: input.reason,
         }
