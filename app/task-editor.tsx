@@ -6,9 +6,24 @@ import { PrimaryButton } from '../src/components/PrimaryButton';
 import { ScreenContainer } from '../src/components/ScreenContainer';
 import { useTaskForge } from '../src/hooks/useTaskForge';
 import { colors } from '../src/theme/colors';
-import type { TaskEffort } from '../src/types/domain';
+import type { RecurrenceRule, TaskEffort, WeekdayCode } from '../src/types/domain';
 
 const EFFORTS: TaskEffort[] = ['quick', 'normal', 'deep'];
+const WEEKDAYS: WeekdayCode[] = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+
+function normalizeDueInput(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined;
+  }
+
+  return parsed.toISOString();
+}
 
 export default function TaskEditorModal() {
   const router = useRouter();
@@ -24,9 +39,49 @@ export default function TaskEditorModal() {
   const [notes, setNotes] = useState(editingTask?.notes ?? '');
   const [effort, setEffort] = useState<TaskEffort>(editingTask?.effort ?? 'normal');
   const [manualXp, setManualXp] = useState(editingTask?.manualXp ? String(editingTask.manualXp) : '');
+  const [dueInput, setDueInput] = useState(editingTask?.dueAt ? editingTask.dueAt : '');
+
+  const [recurrenceKind, setRecurrenceKind] = useState<'none' | 'interval_days' | 'weekly'>(
+    editingTask?.recurrenceRule?.kind ?? 'none',
+  );
+  const [intervalEvery, setIntervalEvery] = useState(
+    editingTask?.recurrenceRule?.kind === 'interval_days'
+      ? String(editingTask.recurrenceRule.every)
+      : '3',
+  );
+  const [weeklyEvery, setWeeklyEvery] = useState(
+    editingTask?.recurrenceRule?.kind === 'weekly' ? String(editingTask.recurrenceRule.every) : '1',
+  );
+  const [weeklyDays, setWeeklyDays] = useState<WeekdayCode[]>(
+    editingTask?.recurrenceRule?.kind === 'weekly' ? editingTask.recurrenceRule.days : ['MO', 'WE', 'FR'],
+  );
+
+  const toggleWeekday = (weekday: WeekdayCode) => {
+    setWeeklyDays((current) =>
+      current.includes(weekday) ? current.filter((day) => day !== weekday) : [...current, weekday],
+    );
+  };
 
   const save = async () => {
     const parsedXp = manualXp.trim() ? Number(manualXp) : undefined;
+    const dueAt = normalizeDueInput(dueInput);
+
+    let recurrenceRule: RecurrenceRule | undefined;
+
+    if (recurrenceKind === 'interval_days') {
+      recurrenceRule = {
+        kind: 'interval_days',
+        every: Math.max(Number(intervalEvery) || 1, 1),
+      };
+    }
+
+    if (recurrenceKind === 'weekly') {
+      recurrenceRule = {
+        kind: 'weekly',
+        every: Math.max(Number(weeklyEvery) || 1, 1),
+        days: weeklyDays.length > 0 ? weeklyDays : ['MO'],
+      };
+    }
 
     await upsertTask({
       id: editingTask?.id,
@@ -34,8 +89,8 @@ export default function TaskEditorModal() {
       notes,
       effort,
       manualXp: Number.isFinite(parsedXp) ? parsedXp : undefined,
-      dueAt: editingTask?.dueAt,
-      recurrenceRule: editingTask?.recurrenceRule,
+      dueAt,
+      recurrenceRule,
       active: editingTask?.active ?? true,
     });
 
@@ -77,6 +132,84 @@ export default function TaskEditorModal() {
             );
           })}
         </View>
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Due date/time (ISO, optional)</Text>
+        <TextInput
+          value={dueInput}
+          onChangeText={setDueInput}
+          style={styles.input}
+          placeholder="2026-03-01T18:30:00Z"
+        />
+        <View style={styles.rowWrap}>
+          <Pressable
+            onPress={() => setDueInput(new Date(Date.now() + 60 * 60 * 1000).toISOString())}
+            style={styles.miniLinkButton}>
+            <Text style={styles.miniLinkText}>In 1 hour</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setDueInput(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString())}
+            style={styles.miniLinkButton}>
+            <Text style={styles.miniLinkText}>In 24 hours</Text>
+          </Pressable>
+          <Pressable onPress={() => setDueInput('')} style={styles.miniLinkButton}>
+            <Text style={styles.miniLinkText}>Clear</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.field}>
+        <Text style={styles.label}>Recurrence</Text>
+        <View style={styles.rowWrap}>
+          {(['none', 'interval_days', 'weekly'] as const).map((kind) => {
+            const selected = recurrenceKind === kind;
+            const label = kind === 'none' ? 'None' : kind === 'interval_days' ? 'Every N days' : 'Weekly';
+            return (
+              <Pressable
+                key={kind}
+                onPress={() => setRecurrenceKind(kind)}
+                style={[styles.chip, selected && styles.chipSelected]}>
+                <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {recurrenceKind === 'interval_days' ? (
+          <TextInput
+            value={intervalEvery}
+            onChangeText={setIntervalEvery}
+            keyboardType="number-pad"
+            style={[styles.input, styles.marginTop]}
+            placeholder="Every N days (e.g. 3)"
+          />
+        ) : null}
+
+        {recurrenceKind === 'weekly' ? (
+          <View style={styles.weeklySection}>
+            <TextInput
+              value={weeklyEvery}
+              onChangeText={setWeeklyEvery}
+              keyboardType="number-pad"
+              style={styles.input}
+              placeholder="Every N weeks (e.g. 1)"
+            />
+            <View style={styles.rowWrap}>
+              {WEEKDAYS.map((day) => {
+                const selected = weeklyDays.includes(day);
+                return (
+                  <Pressable
+                    key={day}
+                    onPress={() => toggleWeekday(day)}
+                    style={[styles.dayChip, selected && styles.chipSelected]}>
+                    <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{day}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.field}>
@@ -127,12 +260,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  rowWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
   chip: {
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 9,
+    backgroundColor: colors.surfaceMuted,
+  },
+  dayChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     backgroundColor: colors.surfaceMuted,
   },
   chipSelected: {
@@ -143,8 +290,29 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: '700',
     textTransform: 'capitalize',
+    fontSize: 12,
   },
   chipTextSelected: {
     color: colors.brandDark,
+  },
+  miniLinkButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: colors.surface,
+  },
+  miniLinkText: {
+    color: colors.brandDark,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  marginTop: {
+    marginTop: 8,
+  },
+  weeklySection: {
+    gap: 8,
+    marginTop: 8,
   },
 });

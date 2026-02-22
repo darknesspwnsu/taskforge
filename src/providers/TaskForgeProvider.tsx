@@ -1,5 +1,5 @@
 import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
-import { compareAsc, endOfDay, isBefore, isToday, parseISO, startOfDay } from 'date-fns';
+import { compareAsc, endOfDay, isAfter, isToday, parseISO } from 'date-fns';
 import React, { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
 
 import type { NotificationPreferences, TaskOccurrence } from '../types/domain';
@@ -253,7 +253,7 @@ export function TaskForgeProvider({ children }: { children: React.ReactNode }) {
         }
 
         const dueDate = parseISO(item.dueAt);
-        return isBefore(startOfDay(new Date()), dueDate) && isBefore(dueDate, endOfDay(parseISO('2100-01-01T00:00:00.000Z')));
+        return isAfter(dueDate, endOfDay(new Date()));
       })
       .sort((a, b) => {
         if (!a.dueAt || !b.dueAt) {

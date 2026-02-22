@@ -1,4 +1,4 @@
-import { addHours, isAfter, isBefore, parseISO, startOfDay } from 'date-fns';
+import { addHours, isBefore, parseISO, startOfDay } from 'date-fns';
 
 import type {
   AppSettings,
@@ -293,7 +293,6 @@ export function syncRecurringOccurrences(
 }
 
 export function buildReminderFeed(snapshot: TaskForgeSnapshot, now = new Date()): TaskOccurrence[] {
-  const oneHourAhead = addHours(now, 1);
   const oneDayAhead = addHours(now, 24);
 
   return snapshot.occurrences
@@ -304,7 +303,14 @@ export function buildReminderFeed(snapshot: TaskForgeSnapshot, now = new Date())
       }
 
       const dueDate = parseISO(item.dueAt);
-      return isBefore(dueDate, oneDayAhead) || isAfter(dueDate, oneHourAhead) || isBefore(dueDate, now);
+      return isBefore(dueDate, oneDayAhead);
+    })
+    .sort((a, b) => {
+      if (!a.dueAt || !b.dueAt) {
+        return 0;
+      }
+
+      return parseISO(a.dueAt).getTime() - parseISO(b.dueAt).getTime();
     })
     .slice(0, 20);
 }
