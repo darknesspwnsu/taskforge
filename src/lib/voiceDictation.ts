@@ -68,7 +68,7 @@ export function startVoiceDictation(options: VoiceDictationOptions): VoiceDictat
 
   const recognition = new Recognition();
   recognition.continuous = true;
-  recognition.interimResults = true;
+  recognition.interimResults = false;
   recognition.lang = options.lang ?? 'en-US';
 
   recognition.onstart = () => {
@@ -79,7 +79,12 @@ export function startVoiceDictation(options: VoiceDictationOptions): VoiceDictat
     const chunks: string[] = [];
 
     for (let index = event.resultIndex; index < event.results.length; index += 1) {
-      const chunk = event.results[index]?.[0]?.transcript;
+      const result = event.results[index];
+      if (result?.isFinal === false) {
+        continue;
+      }
+
+      const chunk = result?.[0]?.transcript;
       if (chunk) {
         chunks.push(chunk);
       }

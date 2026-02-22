@@ -6,6 +6,7 @@ import { AvatarLevelCard } from '../../src/components/AvatarLevelCard';
 import { OccurrenceCard } from '../../src/components/OccurrenceCard';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { ScreenContainer } from '../../src/components/ScreenContainer';
+import { VoiceDictationButton } from '../../src/components/VoiceDictationButton';
 import { useTaskForge } from '../../src/hooks/useTaskForge';
 import { getComplexTaskProgress } from '../../src/lib/taskEngine';
 import { xpThresholdForLevel } from '../../src/lib/xp';
@@ -16,12 +17,28 @@ const EFFORTS: TaskEffort[] = ['quick', 'normal', 'deep'];
 
 type DuePreset = 'none' | '1h' | '24h';
 
+function appendText(previous: string, spoken: string): string {
+  const left = previous.trim();
+  const right = spoken.trim();
+
+  if (!left) {
+    return right;
+  }
+
+  if (!right) {
+    return left;
+  }
+
+  return `${left} ${right}`.replace(/\s+/g, ' ').trim();
+}
+
 export default function TodayScreen() {
   const { snapshot, todayOccurrences, reminderFeed, upsertTask, completeOccurrence, skipOccurrence } = useTaskForge();
 
   const [title, setTitle] = useState('');
   const [effort, setEffort] = useState<TaskEffort>('normal');
   const [duePreset, setDuePreset] = useState<DuePreset>('none');
+  const [quickMessage, setQuickMessage] = useState('');
 
   const nextLevelThreshold = useMemo(() => {
     if (!snapshot) {
@@ -59,6 +76,7 @@ export default function TodayScreen() {
 
   const createQuickTask = async () => {
     if (!title.trim()) {
+      setQuickMessage('Enter a task title first.');
       return;
     }
 
@@ -79,6 +97,7 @@ export default function TodayScreen() {
 
     setTitle('');
     setDuePreset('none');
+    setQuickMessage('');
   };
 
   return (
@@ -98,6 +117,13 @@ export default function TodayScreen() {
 
       <View style={styles.quickAddCard}>
         <Text style={styles.sectionTitle}>Quick add</Text>
+        <View style={styles.quickInputLabelRow}>
+          <Text style={styles.quickInputLabel}>Task title</Text>
+          <VoiceDictationButton
+            onTranscript={(spoken) => setTitle((previous) => appendText(previous, spoken))}
+            onError={setQuickMessage}
+          />
+        </View>
         <TextInput
           value={title}
           onChangeText={setTitle}
@@ -136,6 +162,7 @@ export default function TodayScreen() {
         </View>
 
         <PrimaryButton label="Add Task" onPress={createQuickTask} disabled={!title.trim()} />
+        {quickMessage ? <Text style={styles.quickMessage}>{quickMessage}</Text> : null}
         <View style={styles.quickLinks}>
           <Link href="/task-editor" style={styles.openEditorLink}>
             Open full editor
@@ -244,6 +271,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginBottom: 8,
   },
+  quickInputLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  quickInputLabel: {
+    color: colors.textPrimary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
   input: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -289,6 +326,11 @@ const styles = StyleSheet.create({
   quickLinks: {
     marginTop: 4,
     gap: 2,
+  },
+  quickMessage: {
+    color: colors.brandDark,
+    fontSize: 12,
+    fontWeight: '600',
   },
   emptyCard: {
     borderWidth: 1,
