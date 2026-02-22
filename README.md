@@ -13,6 +13,8 @@ TaskForge is a cross-platform, gamified task app built with Expo (React Native +
 - Level progression, avatar stages, XP ledger history, and streak tracking.
 - Weekly planner that suggests sub-90-minute slots based on work/sleep/free schedule.
 - Optional AI-assisted planner suggestions using your own OpenAI API key.
+- Optional AI XP assistant (with heuristic fallback) for task and retroactive completion forms.
+- Voice dictation buttons for quick-add, task editor, retro logging, and complex task input.
 - ICS calendar import support to seed availability from calendar events.
 - Offline-first local persistence + queued sync actions for server RPC/table sync.
 - In-app reminder feed + local scheduled reminders (native) + web push registration flow.
