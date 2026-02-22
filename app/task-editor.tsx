@@ -11,6 +11,7 @@ import { colors } from '../src/theme/colors';
 import type { RecurrenceRule, TaskEffort, WeekdayCode } from '../src/types/domain';
 
 const EFFORTS: TaskEffort[] = ['quick', 'normal', 'deep'];
+const EFFORT_GUIDE = 'Quick: ~30m / 20 XP · Normal: ~60m / 40 XP · Deep: ~90m / 70 XP';
 const WEEKDAYS: WeekdayCode[] = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
 
 function normalizeDueInput(value: string): string | undefined {
@@ -200,6 +201,7 @@ export default function TaskEditorModal() {
             );
           })}
         </View>
+        <Text style={styles.effortGuide}>{EFFORT_GUIDE}</Text>
       </View>
 
       <View style={styles.field}>
@@ -371,6 +373,11 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: 10,
+  },
+  effortGuide: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: 8,
   },
   rowWrap: {
     flexDirection: 'row',

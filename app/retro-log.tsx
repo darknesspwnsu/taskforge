@@ -11,6 +11,7 @@ import { colors } from '../src/theme/colors';
 import type { TaskEffort } from '../src/types/domain';
 
 const EFFORTS: TaskEffort[] = ['quick', 'normal', 'deep'];
+const EFFORT_GUIDE = 'Quick: ~30m / 20 XP · Normal: ~60m / 40 XP · Deep: ~90m / 70 XP';
 
 function appendText(previous: string, spoken: string): string {
   const left = previous.trim();
@@ -143,6 +144,7 @@ export default function RetroLogScreen() {
             );
           })}
         </View>
+        <Text style={styles.effortGuide}>{EFFORT_GUIDE}</Text>
       </View>
 
       <View style={styles.field}>
@@ -271,6 +273,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginTop: 8,
+  },
+  effortGuide: {
+    color: colors.textSecondary,
+    fontSize: 12,
     marginTop: 8,
   },
   chip: {

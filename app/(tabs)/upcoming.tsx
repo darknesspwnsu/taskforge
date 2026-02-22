@@ -1,15 +1,13 @@
 import { Link } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { OccurrenceCard } from '../../src/components/OccurrenceCard';
+import { GroupedOccurrenceList } from '../../src/components/GroupedOccurrenceList';
 import { ScreenContainer } from '../../src/components/ScreenContainer';
 import { useTaskForge } from '../../src/hooks/useTaskForge';
 import { colors } from '../../src/theme/colors';
 
 export default function UpcomingScreen() {
   const { snapshot, upcomingOccurrences, completeOccurrence, skipOccurrence } = useTaskForge();
-
-  const taskById = new Map((snapshot?.tasks ?? []).map((task) => [task.id, task]));
 
   return (
     <ScreenContainer>
@@ -23,28 +21,13 @@ export default function UpcomingScreen() {
         </Link>
       </View>
 
-      {upcomingOccurrences.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>No upcoming deadlines yet.</Text>
-        </View>
-      ) : (
-        upcomingOccurrences.map((occurrence) => {
-          const task = taskById.get(occurrence.taskId);
-          if (!task) {
-            return null;
-          }
-
-          return (
-            <OccurrenceCard
-              key={occurrence.id}
-              occurrence={occurrence}
-              task={task}
-              onComplete={() => void completeOccurrence(occurrence.id)}
-              onSkip={() => void skipOccurrence(occurrence.id)}
-            />
-          );
-        })
-      )}
+      <GroupedOccurrenceList
+        snapshot={snapshot}
+        occurrences={upcomingOccurrences}
+        emptyText="No upcoming deadlines yet."
+        onComplete={(occurrenceId) => void completeOccurrence(occurrenceId)}
+        onSkip={(occurrenceId) => void skipOccurrence(occurrenceId)}
+      />
     </ScreenContainer>
   );
 }
@@ -76,17 +59,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     marginTop: 8,
-  },
-  emptyCard: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderStyle: 'dashed',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
-  },
-  emptyText: {
-    color: colors.textSecondary,
-    textAlign: 'center',
   },
 });

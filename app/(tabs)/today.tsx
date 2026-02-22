@@ -3,7 +3,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { AvatarLevelCard } from '../../src/components/AvatarLevelCard';
-import { OccurrenceCard } from '../../src/components/OccurrenceCard';
+import { GroupedOccurrenceList } from '../../src/components/GroupedOccurrenceList';
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { ScreenContainer } from '../../src/components/ScreenContainer';
 import { VoiceDictationButton } from '../../src/components/VoiceDictationButton';
@@ -16,6 +16,7 @@ import type { TaskEffort } from '../../src/types/domain';
 const EFFORTS: TaskEffort[] = ['quick', 'normal', 'deep'];
 
 type DuePreset = 'none' | '1h' | '24h';
+const EFFORT_LEGEND = 'Quick: ~30m / 20 XP · Normal: ~60m / 40 XP · Deep: ~90m / 70 XP';
 
 function appendText(previous: string, spoken: string): string {
   const left = previous.trim();
@@ -145,6 +146,7 @@ export default function TodayScreen() {
             );
           })}
         </View>
+        <Text style={styles.effortLegend}>{EFFORT_LEGEND}</Text>
 
         <View style={styles.rowWrap}>
           {(['none', '1h', '24h'] as DuePreset[]).map((preset) => {
@@ -195,30 +197,13 @@ export default function TodayScreen() {
       })}
 
       <Text style={styles.sectionTitle}>Due now</Text>
-      {(todayOccurrences.length === 0 ? [null] : todayOccurrences).map((occurrence, index) => {
-        if (!occurrence) {
-          return (
-            <View key={`empty-${index}`} style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No pending tasks for today.</Text>
-            </View>
-          );
-        }
-
-        const task = taskById.get(occurrence.taskId);
-        if (!task) {
-          return null;
-        }
-
-        return (
-          <OccurrenceCard
-            key={occurrence.id}
-            occurrence={occurrence}
-            task={task}
-            onComplete={() => void completeOccurrence(occurrence.id)}
-            onSkip={() => void skipOccurrence(occurrence.id)}
-          />
-        );
-      })}
+      <GroupedOccurrenceList
+        snapshot={snapshot}
+        occurrences={todayOccurrences}
+        emptyText="No pending tasks for today."
+        onComplete={(occurrenceId) => void completeOccurrence(occurrenceId)}
+        onSkip={(occurrenceId) => void skipOccurrence(occurrenceId)}
+      />
 
       <Text style={styles.sectionTitle}>Reminder feed</Text>
       {reminderFeed.length === 0 ? (
@@ -294,6 +279,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  effortLegend: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
   },
   chip: {
     borderWidth: 1,
