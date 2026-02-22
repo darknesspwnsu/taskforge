@@ -297,41 +297,36 @@ export function TaskForgeProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      await persistNextSnapshot(queryClient, user.id, (current) => {
-        const shouldUseAi = Boolean(
-          (options?.useAi ?? current.settings.planner.autoUseAi) && options?.apiKey?.trim(),
-        );
-
-        if (!shouldUseAi) {
-          const heuristic = generateHeuristicPlannerSuggestions({ snapshot: current });
-          return setPlannerSuggestions(current, heuristic);
-        }
-
-        return current;
-      });
-
-      if (!(options?.useAi ?? false) || !options?.apiKey?.trim()) {
+      const key = queryKey(user.id);
+      const current = queryClient.getQueryData<TaskForgeSnapshot>(key);
+      if (!current) {
         return;
       }
 
-      const key = queryKey(user.id);
-      const latest = queryClient.getQueryData<TaskForgeSnapshot>(key);
-      if (!latest) {
+      const useAi = options?.useAi ?? current.settings.planner.autoUseAi;
+      const apiKey = options?.apiKey?.trim() || current.settings.planner.openAiApiKey?.trim();
+
+      const heuristic = generateHeuristicPlannerSuggestions({ snapshot: current });
+      let nextSnapshot = setPlannerSuggestions(current, heuristic);
+      queryClient.setQueryData(key, nextSnapshot);
+      await saveSnapshot(user.id, nextSnapshot);
+
+      if (!useAi || !apiKey) {
         return;
       }
 
       const aiSuggestions = await generateAiPlannerSuggestions({
-        snapshot: latest,
-        apiKey: options.apiKey.trim(),
+        snapshot: nextSnapshot,
+        apiKey,
       });
 
       if (!aiSuggestions) {
         return;
       }
 
-      const next = setPlannerSuggestions(latest, aiSuggestions);
-      queryClient.setQueryData(key, next);
-      await saveSnapshot(user.id, next);
+      nextSnapshot = setPlannerSuggestions(nextSnapshot, aiSuggestions);
+      queryClient.setQueryData(key, nextSnapshot);
+      await saveSnapshot(user.id, nextSnapshot);
     },
     [queryClient, user],
   );

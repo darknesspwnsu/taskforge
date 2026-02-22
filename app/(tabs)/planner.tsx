@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
 import { PrimaryButton } from '../../src/components/PrimaryButton';
 import { ScreenContainer } from '../../src/components/ScreenContainer';
@@ -18,11 +18,13 @@ function PlannerInputRow({
   value,
   onChangeText,
   placeholder,
+  secureTextEntry,
 }: {
   label: string;
   value: string;
   onChangeText: (value: string) => void;
   placeholder: string;
+  secureTextEntry?: boolean;
 }) {
   return (
     <View style={styles.field}>
@@ -33,6 +35,8 @@ function PlannerInputRow({
         placeholder={placeholder}
         placeholderTextColor={colors.textSecondary}
         style={styles.input}
+        secureTextEntry={secureTextEntry}
+        autoCapitalize="none"
       />
     </View>
   );
@@ -71,7 +75,7 @@ export default function PlannerScreen() {
     String(snapshot?.settings.planner.maxSessionMinutes ?? 90),
   );
   const [aiEnabled, setAiEnabled] = useState(snapshot?.settings.planner.autoUseAi ?? false);
-  const [aiApiKey, setAiApiKey] = useState('');
+  const [aiApiKey, setAiApiKey] = useState(snapshot?.settings.planner.openAiApiKey ?? '');
   const [icsUrl, setIcsUrl] = useState('');
 
   const eventsCount = snapshot?.plannerCalendarEvents.length ?? 0;
@@ -101,6 +105,7 @@ export default function PlannerScreen() {
       freeWeekends: [{ start: freeWeekendStart, end: freeWeekendEnd }],
       maxSessionMinutes: Math.max(30, Math.min(Number(maxSessionMinutes) || 90, 90)),
       autoUseAi: aiEnabled,
+      openAiApiKey: aiApiKey.trim(),
     });
     setSaving(false);
     setMessage('Planner preferences saved.');
@@ -179,10 +184,11 @@ export default function PlannerScreen() {
         </View>
 
         <PlannerInputRow
-          label="OpenAI API key (personal, optional)"
+          label="OpenAI API key (stored locally, optional)"
           value={aiApiKey}
           onChangeText={setAiApiKey}
           placeholder="sk-..."
+          secureTextEntry
         />
 
         <PrimaryButton label="Generate Suggestions" onPress={runPlanner} loading={generating} />
