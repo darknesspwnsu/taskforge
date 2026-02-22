@@ -1,5 +1,6 @@
 import { addDays, addWeeks, isAfter, subDays } from 'date-fns';
 
+import { createUuid } from './id';
 import type { Task, TaskOccurrence, WeekdayCode } from '../types/domain';
 
 const DAY_CODE_TO_INDEX: Record<WeekdayCode, number> = {
@@ -69,7 +70,7 @@ export function generateFutureOccurrences(input: {
 
         if (!existingByDay.has(dayKey)) {
           output.push({
-            id: `local-${task.id}-${dayKey}`,
+            id: createUuid(),
             taskId: task.id,
             userId: task.userId,
             dueAt: cursor.toISOString(),
@@ -106,7 +107,7 @@ export function generateFutureOccurrences(input: {
       }
 
       output.push({
-        id: `local-${task.id}-${dayKey}`,
+        id: createUuid(),
         taskId: task.id,
         userId: task.userId,
         dueAt: dayDate.toISOString(),
