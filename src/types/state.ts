@@ -2,6 +2,8 @@ import type {
   AppSettings,
   AvatarState,
   OfflineAction,
+  PlannerCalendarEvent,
+  PlannerSuggestion,
   Task,
   TaskOccurrence,
   UserProgress,
@@ -16,6 +18,8 @@ export type TaskForgeSnapshot = {
   avatar: AvatarState;
   settings: AppSettings;
   offlineQueue: OfflineAction[];
+  plannerSuggestions: PlannerSuggestion[];
+  plannerCalendarEvents: PlannerCalendarEvent[];
   lastSyncedAt?: string;
 };
 
@@ -33,6 +37,14 @@ export function createDefaultSettings(timezone: string): AppSettings {
       oneHourBeforeEnabled: true,
       dailySummaryEnabled: false,
       dailySummaryHour: 8,
+    },
+    planner: {
+      workWeekdays: [{ start: '09:00', end: '17:00' }],
+      sleepDaily: [{ start: '23:00', end: '07:00' }],
+      freeWeekdays: [{ start: '18:00', end: '21:30' }],
+      freeWeekends: [{ start: '10:00', end: '17:00' }],
+      maxSessionMinutes: 90,
+      autoUseAi: false,
     },
   };
 }
@@ -60,5 +72,7 @@ export function createDefaultSnapshot(userId: string, timezone: string): TaskFor
     },
     settings: createDefaultSettings(timezone),
     offlineQueue: [],
+    plannerSuggestions: [],
+    plannerCalendarEvents: [],
   };
 }

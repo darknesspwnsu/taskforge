@@ -2,10 +2,16 @@ import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
 import { compareAsc, endOfDay, isAfter, isToday, parseISO } from 'date-fns';
 import React, { createContext, useCallback, useContext, useEffect, useMemo } from 'react';
 
-import type { NotificationPreferences, TaskOccurrence } from '../types/domain';
+import type {
+  NotificationPreferences,
+  PlannerCalendarEvent,
+  PlannerSuggestion,
+  TaskOccurrence,
+} from '../types/domain';
 import type { TaskForgeSnapshot } from '../types/state';
 import { createDefaultSnapshot } from '../types/state';
 import { createClientActionId } from '../lib/id';
+import { fetchAndParseIcs } from '../lib/ics';
 import {
   createCompleteActionPayload,
   createSkipActionPayload,
@@ -13,13 +19,20 @@ import {
   flushOfflineQueue,
 } from '../lib/offlineQueue';
 import { syncLocalReminderSchedules } from '../lib/localReminderScheduler';
+import { generateAiPlannerSuggestions, generateHeuristicPlannerSuggestions } from '../lib/planner';
 import {
   buildReminderFeed,
+  createComplexTaskInSnapshot,
   completeOccurrenceInSnapshot,
+  logRetroactiveCompletionInSnapshot,
+  setPlannerCalendarEvents as applyPlannerCalendarEvents,
+  setPlannerSuggestions,
   skipOccurrenceInSnapshot,
   syncRecurringOccurrences,
   updateSettings,
   upsertTaskInSnapshot,
+  type ComplexSubtaskInput,
+  type RetroactiveTaskInput,
   type UpsertTaskInput,
 } from '../lib/taskEngine';
 import { loadSnapshot, saveSnapshot } from '../lib/storage';
@@ -31,9 +44,21 @@ type TaskForgeContextValue = {
   todayOccurrences: TaskOccurrence[];
   upcomingOccurrences: TaskOccurrence[];
   reminderFeed: TaskOccurrence[];
+  plannerSuggestions: PlannerSuggestion[];
   upsertTask: (input: UpsertTaskInput) => Promise<void>;
   completeOccurrence: (occurrenceId: string) => Promise<void>;
   skipOccurrence: (occurrenceId: string, reason?: string) => Promise<void>;
+  logRetroactiveCompletion: (input: RetroactiveTaskInput) => Promise<void>;
+  createComplexTask: (input: {
+    title: string;
+    notes?: string;
+    dueAt?: string;
+    estimatedMinutes?: number;
+    subtasks: ComplexSubtaskInput[];
+  }) => Promise<void>;
+  setPlannerCalendarEvents: (events: PlannerCalendarEvent[]) => Promise<void>;
+  importPlannerCalendarFromIcs: (icsUrl: string) => Promise<{ ok: boolean; message: string }>;
+  generatePlannerSuggestions: (options?: { apiKey?: string; useAi?: boolean }) => Promise<void>;
   setOnboardingComplete: (completed: boolean) => Promise<void>;
   updateNotificationSettings: (preferences: Partial<NotificationPreferences>) => Promise<void>;
   flushQueue: () => Promise<void>;
@@ -160,6 +185,155 @@ export function TaskForgeProvider({ children }: { children: React.ReactNode }) {
     [queryClient, user],
   );
 
+  const logRetroactiveCompletion = useCallback(
+    async (input: RetroactiveTaskInput) => {
+      if (!user) {
+        return;
+      }
+
+      await persistNextSnapshot(queryClient, user.id, (current) => {
+        const retroResult = logRetroactiveCompletionInSnapshot(current, user.id, input);
+        let next = enqueueOfflineAction(retroResult.snapshot, {
+          clientActionId: createClientActionId('create-retro-task'),
+          type: 'create_task',
+          payload: retroResult.task,
+        });
+
+        const completePayload = {
+          occurrenceId: retroResult.occurrence.id,
+          completedAt: retroResult.occurrence.completedAt,
+          clientActionId: createClientActionId('complete-retro-task'),
+        };
+
+        next = enqueueOfflineAction(next, {
+          clientActionId: String(completePayload.clientActionId),
+          type: 'complete_occurrence',
+          payload: completePayload,
+        });
+
+        return next;
+      });
+    },
+    [queryClient, user],
+  );
+
+  const createComplexTask = useCallback(
+    async (input: {
+      title: string;
+      notes?: string;
+      dueAt?: string;
+      estimatedMinutes?: number;
+      subtasks: ComplexSubtaskInput[];
+    }) => {
+      if (!user || input.subtasks.length === 0) {
+        return;
+      }
+
+      await persistNextSnapshot(queryClient, user.id, (current) => {
+        const result = createComplexTaskInSnapshot(current, user.id, input, new Date());
+        let next = result.snapshot;
+
+        const queueTasks = [result.parentTask, ...result.subtasks];
+        for (const queuedTask of queueTasks) {
+          next = enqueueOfflineAction(next, {
+            clientActionId: createClientActionId('create-complex-task'),
+            type: 'create_task',
+            payload: queuedTask,
+          });
+        }
+
+        return next;
+      });
+    },
+    [queryClient, user],
+  );
+
+  const setPlannerCalendarEvents = useCallback(
+    async (events: PlannerCalendarEvent[]) => {
+      if (!user) {
+        return;
+      }
+
+      await persistNextSnapshot(queryClient, user.id, (current) => applyPlannerCalendarEvents(current, events));
+    },
+    [queryClient, user],
+  );
+
+  const importPlannerCalendarFromIcs = useCallback(
+    async (icsUrl: string): Promise<{ ok: boolean; message: string }> => {
+      if (!user) {
+        return { ok: false, message: 'Missing user session.' };
+      }
+
+      const trimmed = icsUrl.trim();
+      if (!trimmed) {
+        return { ok: false, message: 'Enter a valid ICS URL.' };
+      }
+
+      try {
+        const events = await fetchAndParseIcs(trimmed);
+        await persistNextSnapshot(queryClient, user.id, (current) =>
+          applyPlannerCalendarEvents(current, events),
+        );
+        return {
+          ok: true,
+          message: `Imported ${events.length} calendar events.`,
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : 'Unable to import ICS feed.',
+        };
+      }
+    },
+    [queryClient, user],
+  );
+
+  const generatePlannerSuggestions = useCallback(
+    async (options?: { apiKey?: string; useAi?: boolean }) => {
+      if (!user) {
+        return;
+      }
+
+      await persistNextSnapshot(queryClient, user.id, (current) => {
+        const shouldUseAi = Boolean(
+          (options?.useAi ?? current.settings.planner.autoUseAi) && options?.apiKey?.trim(),
+        );
+
+        if (!shouldUseAi) {
+          const heuristic = generateHeuristicPlannerSuggestions({ snapshot: current });
+          return setPlannerSuggestions(current, heuristic);
+        }
+
+        return current;
+      });
+
+      if (!(options?.useAi ?? false) || !options?.apiKey?.trim()) {
+        return;
+      }
+
+      const key = queryKey(user.id);
+      const latest = queryClient.getQueryData<TaskForgeSnapshot>(key);
+      if (!latest) {
+        return;
+      }
+
+      const aiSuggestions = await generateAiPlannerSuggestions({
+        snapshot: latest,
+        apiKey: options.apiKey.trim(),
+      });
+
+      if (!aiSuggestions) {
+        return;
+      }
+
+      const next = setPlannerSuggestions(latest, aiSuggestions);
+      queryClient.setQueryData(key, next);
+      await saveSnapshot(user.id, next);
+    },
+    [queryClient, user],
+  );
+
   const setOnboardingComplete = useCallback(
     async (completed: boolean) => {
       if (!user) {
@@ -240,6 +414,7 @@ export function TaskForgeProvider({ children }: { children: React.ReactNode }) {
         todayOccurrences: [] as TaskOccurrence[],
         upcomingOccurrences: [] as TaskOccurrence[],
         reminderFeed: [] as TaskOccurrence[],
+        plannerSuggestions: [] as PlannerSuggestion[],
       };
     }
 
@@ -276,6 +451,7 @@ export function TaskForgeProvider({ children }: { children: React.ReactNode }) {
       todayOccurrences,
       upcomingOccurrences,
       reminderFeed: buildReminderFeed(snapshot),
+      plannerSuggestions: snapshot.plannerSuggestions,
     };
   }, [snapshot]);
 
@@ -287,6 +463,11 @@ export function TaskForgeProvider({ children }: { children: React.ReactNode }) {
       upsertTask,
       completeOccurrence,
       skipOccurrence,
+      logRetroactiveCompletion,
+      createComplexTask,
+      setPlannerCalendarEvents,
+      importPlannerCalendarFromIcs,
+      generatePlannerSuggestions,
       setOnboardingComplete,
       updateNotificationSettings,
       flushQueue,
@@ -294,8 +475,13 @@ export function TaskForgeProvider({ children }: { children: React.ReactNode }) {
     [
       derived,
       completeOccurrence,
+      createComplexTask,
       flushQueue,
+      generatePlannerSuggestions,
+      importPlannerCalendarFromIcs,
+      logRetroactiveCompletion,
       setOnboardingComplete,
+      setPlannerCalendarEvents,
       skipOccurrence,
       snapshot,
       snapshotQuery.isPending,

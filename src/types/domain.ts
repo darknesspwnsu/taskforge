@@ -1,4 +1,5 @@
 export type TaskEffort = 'quick' | 'normal' | 'deep';
+export type TaskKind = 'standard' | 'complex_parent' | 'subtask';
 
 export type OccurrenceStatus = 'pending' | 'completed' | 'skipped' | 'canceled';
 
@@ -21,6 +22,9 @@ export type Task = {
   title: string;
   notes?: string;
   effort: TaskEffort;
+  taskKind?: TaskKind;
+  parentTaskId?: string;
+  estimatedMinutes?: number;
   dueAt?: string;
   manualXp?: number;
   recurrenceRule?: RecurrenceRule;
@@ -89,10 +93,49 @@ export type NotificationPreferences = {
   dailySummaryHour: number;
 };
 
+export type TimeWindow = {
+  start: string;
+  end: string;
+};
+
+export type PlannerPreferences = {
+  workWeekdays: TimeWindow[];
+  sleepDaily: TimeWindow[];
+  freeWeekdays: TimeWindow[];
+  freeWeekends: TimeWindow[];
+  maxSessionMinutes: number;
+  autoUseAi: boolean;
+};
+
+export type PlannerSuggestionSource = 'heuristic' | 'ai';
+
+export type PlannerSuggestion = {
+  id: string;
+  taskId: string;
+  occurrenceId?: string;
+  title: string;
+  start: string;
+  end: string;
+  minutes: number;
+  source: PlannerSuggestionSource;
+  note?: string;
+};
+
+export type PlannerCalendarEventSource = 'manual' | 'ics';
+
+export type PlannerCalendarEvent = {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  source: PlannerCalendarEventSource;
+};
+
 export type AppSettings = {
   timezone: string;
   onboardingComplete: boolean;
   notifications: NotificationPreferences;
+  planner: PlannerPreferences;
 };
 
 export type OfflineActionType =
