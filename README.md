@@ -6,9 +6,14 @@ TaskForge is a cross-platform, gamified task app built with Expo (React Native +
 
 - Magic-link auth (Supabase) with local demo fallback when env vars are missing.
 - Task CRUD with optional deadlines and manual XP override.
+- Retroactive completion logging for earned credit (for example: chores done yesterday).
+- Complex parent tasks with structured subtasks.
 - Recurring tasks (`interval_days` and `weekly`) with skip-per-occurrence.
 - XP engine with early/on-time/late timing buckets and streak multipliers.
 - Level progression, avatar stages, XP ledger history, and streak tracking.
+- Weekly planner that suggests sub-90-minute slots based on work/sleep/free schedule.
+- Optional AI-assisted planner suggestions using your own OpenAI API key.
+- ICS calendar import support to seed availability from calendar events.
 - Offline-first local persistence + queued sync actions for server RPC/table sync.
 - In-app reminder feed + local scheduled reminders (native) + web push registration flow.
 
@@ -54,6 +59,7 @@ Migration files:
 
 - `supabase/migrations/20260222011000_core_schema.sql`
 - `supabase/migrations/20260222012000_rpc_and_rls.sql`
+- `supabase/migrations/20260222020000_task_extensions.sql`
 
 ## Testing
 

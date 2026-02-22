@@ -35,3 +35,11 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
 - `generate_occurrences(user_id uuid, horizon_days int default 30)`
 - `upsert_task(task_id uuid, title text, notes text, effort text, due_at timestamptz, manual_xp integer, recurrence_rule jsonb, active boolean)`
 - `cancel_recurrence(task_id uuid)`
+
+## 5. Task extension fields
+
+The `20260222020000_task_extensions.sql` migration adds:
+
+- `tasks.task_kind` (`standard`, `complex_parent`, `subtask`)
+- `tasks.parent_task_id` (self reference)
+- `tasks.estimated_minutes`
