@@ -12,6 +12,7 @@ import {
   enqueueOfflineAction,
   flushOfflineQueue,
 } from '../lib/offlineQueue';
+import { syncLocalReminderSchedules } from '../lib/localReminderScheduler';
 import {
   buildReminderFeed,
   completeOccurrenceInSnapshot,
@@ -222,6 +223,14 @@ export function TaskForgeProvider({ children }: { children: React.ReactNode }) {
       clearInterval(interval);
     };
   }, [flushQueue, user]);
+
+  useEffect(() => {
+    if (!user || !snapshotQuery.data) {
+      return;
+    }
+
+    void syncLocalReminderSchedules(user.id, snapshotQuery.data);
+  }, [snapshotQuery.data, user]);
 
   const snapshot = snapshotQuery.data ?? null;
 
