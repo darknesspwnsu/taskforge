@@ -45,6 +45,7 @@ export function createDefaultSettings(timezone: string): AppSettings {
       freeWeekends: [{ start: '10:00', end: '17:00' }],
       maxSessionMinutes: 90,
       autoUseAi: false,
+      openAiApiKey: '',
     },
   };
 }

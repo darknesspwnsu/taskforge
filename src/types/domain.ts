@@ -105,6 +105,7 @@ export type PlannerPreferences = {
   freeWeekends: TimeWindow[];
   maxSessionMinutes: number;
   autoUseAi: boolean;
+  openAiApiKey?: string;
 };
 
 export type PlannerSuggestionSource = 'heuristic' | 'ai';
