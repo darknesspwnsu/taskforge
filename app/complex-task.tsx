@@ -4,6 +4,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { PrimaryButton } from '../src/components/PrimaryButton';
 import { ScreenContainer } from '../src/components/ScreenContainer';
+import { VoiceDictationButton } from '../src/components/VoiceDictationButton';
 import { useTaskForge } from '../src/hooks/useTaskForge';
 import { colors } from '../src/theme/colors';
 import type { ComplexSubtaskInput } from '../src/lib/taskEngine';
@@ -31,6 +32,21 @@ function parseSubtaskLines(lines: string): ComplexSubtaskInput[] {
     .filter((item) => item.title.length > 0);
 }
 
+function appendText(previous: string, spoken: string): string {
+  const left = previous.trim();
+  const right = spoken.trim();
+
+  if (!left) {
+    return right;
+  }
+
+  if (!right) {
+    return left;
+  }
+
+  return `${left} ${right}`.replace(/\s+/g, ' ').trim();
+}
+
 export default function ComplexTaskScreen() {
   const router = useRouter();
   const { createComplexTask } = useTaskForge();
@@ -41,10 +57,12 @@ export default function ComplexTaskScreen() {
   const [estimatedMinutes, setEstimatedMinutes] = useState('240');
   const [subtaskLines, setSubtaskLines] = useState('Pack kitchen | normal | 60\nBook movers | quick | 30');
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
 
   const saveComplexTask = async () => {
     const subtasks = parseSubtaskLines(subtaskLines);
     if (!title.trim() || subtasks.length === 0) {
+      setMessage('Add a parent title and at least one subtask line.');
       return;
     }
 
@@ -74,7 +92,13 @@ export default function ComplexTaskScreen() {
       </Text>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Parent task title</Text>
+        <View style={styles.labelRow}>
+          <Text style={styles.label}>Parent task title</Text>
+          <VoiceDictationButton
+            onTranscript={(spoken) => setTitle((previous) => appendText(previous, spoken))}
+            onError={setMessage}
+          />
+        </View>
         <TextInput
           value={title}
           onChangeText={setTitle}
@@ -84,7 +108,13 @@ export default function ComplexTaskScreen() {
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Notes (optional)</Text>
+        <View style={styles.labelRow}>
+          <Text style={styles.label}>Notes (optional)</Text>
+          <VoiceDictationButton
+            onTranscript={(spoken) => setNotes((previous) => appendText(previous, spoken))}
+            onError={setMessage}
+          />
+        </View>
         <TextInput
           value={notes}
           onChangeText={setNotes}
@@ -116,7 +146,15 @@ export default function ComplexTaskScreen() {
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Subtasks (one per line)</Text>
+        <View style={styles.labelRow}>
+          <Text style={styles.label}>Subtasks (one per line)</Text>
+          <VoiceDictationButton
+            onTranscript={(spoken) =>
+              setSubtaskLines((previous) => (previous.trim().length > 0 ? `${previous}\n${spoken}` : spoken))
+            }
+            onError={setMessage}
+          />
+        </View>
         <Text style={styles.helper}>Format: `title | effort(optional) | minutes(optional)`</Text>
         <TextInput
           value={subtaskLines}
@@ -127,6 +165,7 @@ export default function ComplexTaskScreen() {
         />
       </View>
 
+      {message ? <Text style={styles.message}>{message}</Text> : null}
       <PrimaryButton label="Create Complex Task" onPress={saveComplexTask} loading={saving} />
     </ScreenContainer>
   );
@@ -153,6 +192,12 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     fontSize: 12,
   },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
   helper: {
     color: colors.textSecondary,
     fontSize: 12,
@@ -174,5 +219,11 @@ const styles = StyleSheet.create({
   subtaskArea: {
     minHeight: 140,
     textAlignVertical: 'top',
+  },
+  message: {
+    color: colors.brandDark,
+    fontSize: 12,
+    marginBottom: 8,
+    fontWeight: '600',
   },
 });
