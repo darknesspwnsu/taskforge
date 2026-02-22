@@ -4,7 +4,9 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { PrimaryButton } from '../src/components/PrimaryButton';
 import { ScreenContainer } from '../src/components/ScreenContainer';
+import { VoiceDictationButton } from '../src/components/VoiceDictationButton';
 import { useTaskForge } from '../src/hooks/useTaskForge';
+import { suggestXpRecommendation, type XpRecommendation } from '../src/lib/xpSuggestion';
 import { colors } from '../src/theme/colors';
 import type { RecurrenceRule, TaskEffort, WeekdayCode } from '../src/types/domain';
 
@@ -25,6 +27,21 @@ function normalizeDueInput(value: string): string | undefined {
   return parsed.toISOString();
 }
 
+function appendText(previous: string, spoken: string): string {
+  const left = previous.trim();
+  const right = spoken.trim();
+
+  if (!left) {
+    return right;
+  }
+
+  if (!right) {
+    return left;
+  }
+
+  return `${left} ${right}`.replace(/\s+/g, ' ').trim();
+}
+
 export default function TaskEditorModal() {
   const router = useRouter();
   const { taskId } = useLocalSearchParams<{ taskId?: string }>();
@@ -43,6 +60,11 @@ export default function TaskEditorModal() {
     editingTask?.estimatedMinutes ? String(editingTask.estimatedMinutes) : '',
   );
   const [dueInput, setDueInput] = useState(editingTask?.dueAt ? editingTask.dueAt : '');
+  const [assistantMessage, setAssistantMessage] = useState('');
+  const [xpRecommendation, setXpRecommendation] = useState<XpRecommendation | null>(null);
+  const [recommendingXp, setRecommendingXp] = useState(false);
+
+  const plannerApiKey = snapshot?.settings.planner.openAiApiKey?.trim() || '';
 
   const [recurrenceKind, setRecurrenceKind] = useState<'none' | 'interval_days' | 'weekly'>(
     editingTask?.recurrenceRule?.kind ?? 'none',
@@ -63,6 +85,35 @@ export default function TaskEditorModal() {
     setWeeklyDays((current) =>
       current.includes(weekday) ? current.filter((day) => day !== weekday) : [...current, weekday],
     );
+  };
+
+  const recommendXp = async () => {
+    if (!title.trim()) {
+      setAssistantMessage('Enter a task title first so XP can be estimated.');
+      return;
+    }
+
+    setRecommendingXp(true);
+    const parsedEstimatedMinutes = estimatedMinutes.trim() ? Number(estimatedMinutes) : undefined;
+
+    const recommendation = await suggestXpRecommendation({
+      title,
+      notes,
+      effort,
+      dueAt: normalizeDueInput(dueInput),
+      estimatedMinutes: Number.isFinite(parsedEstimatedMinutes) ? parsedEstimatedMinutes : undefined,
+      apiKey: plannerApiKey || undefined,
+    });
+
+    setXpRecommendation(recommendation);
+    setManualXp(String(recommendation.suggestedXp));
+    setEstimatedMinutes(String(recommendation.estimatedMinutes));
+    setAssistantMessage(
+      recommendation.source === 'ai'
+        ? 'AI recommendation applied to XP and estimated minutes.'
+        : 'Heuristic recommendation applied. Add an OpenAI key in Planner to enable AI mode.',
+    );
+    setRecommendingXp(false);
   };
 
   const save = async () => {
@@ -107,12 +158,24 @@ export default function TaskEditorModal() {
       <Text style={styles.title}>{editingTask ? 'Edit Task' : 'Create Task'}</Text>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Title</Text>
+        <View style={styles.labelRow}>
+          <Text style={styles.label}>Title</Text>
+          <VoiceDictationButton
+            onTranscript={(spoken) => setTitle((previous) => appendText(previous, spoken))}
+            onError={setAssistantMessage}
+          />
+        </View>
         <TextInput value={title} onChangeText={setTitle} style={styles.input} placeholder="Task title" />
       </View>
 
       <View style={styles.field}>
-        <Text style={styles.label}>Notes</Text>
+        <View style={styles.labelRow}>
+          <Text style={styles.label}>Notes</Text>
+          <VoiceDictationButton
+            onTranscript={(spoken) => setNotes((previous) => appendText(previous, spoken))}
+            onError={setAssistantMessage}
+          />
+        </View>
         <TextInput
           value={notes}
           onChangeText={setNotes}
@@ -217,6 +280,31 @@ export default function TaskEditorModal() {
         ) : null}
       </View>
 
+      <View style={styles.assistantCard}>
+        <Text style={styles.assistantTitle}>XP Assistant</Text>
+        <Text style={styles.assistantText}>
+          {plannerApiKey
+            ? 'Uses your saved OpenAI key to estimate tediousness, time, and XP.'
+            : 'Uses heuristic fallback. Add an OpenAI key in Planner for AI-based estimates.'}
+        </Text>
+
+        <PrimaryButton
+          label={plannerApiKey ? 'Recommend XP (AI)' : 'Recommend XP (Heuristic)'}
+          onPress={recommendXp}
+          loading={recommendingXp}
+          disabled={!title.trim()}
+        />
+
+        {xpRecommendation ? (
+          <View style={styles.assistantResult}>
+            <Text style={styles.assistantResultText}>
+              Suggested XP: {xpRecommendation.suggestedXp} · Est. time: {xpRecommendation.estimatedMinutes}m · Tediousness: {xpRecommendation.tediousness}/5
+            </Text>
+            <Text style={styles.assistantReason}>{xpRecommendation.rationale}</Text>
+          </View>
+        ) : null}
+      </View>
+
       <View style={styles.field}>
         <Text style={styles.label}>Estimated minutes (optional)</Text>
         <TextInput
@@ -239,6 +327,8 @@ export default function TaskEditorModal() {
         />
       </View>
 
+      {assistantMessage ? <Text style={styles.message}>{assistantMessage}</Text> : null}
+
       <PrimaryButton label="Save Task" onPress={save} disabled={!title.trim()} />
     </ScreenContainer>
   );
@@ -258,6 +348,12 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontWeight: '700',
     marginBottom: 8,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
   input: {
     borderWidth: 1,
@@ -330,5 +426,44 @@ const styles = StyleSheet.create({
   weeklySection: {
     gap: 8,
     marginTop: 8,
+  },
+  assistantCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    padding: 12,
+    marginBottom: 14,
+    gap: 8,
+  },
+  assistantTitle: {
+    color: colors.textPrimary,
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  assistantText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+  },
+  assistantResult: {
+    borderRadius: 10,
+    padding: 8,
+    backgroundColor: colors.surfaceMuted,
+  },
+  assistantResultText: {
+    color: colors.textPrimary,
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  assistantReason: {
+    color: colors.textSecondary,
+    marginTop: 5,
+    fontSize: 12,
+  },
+  message: {
+    color: colors.brandDark,
+    fontSize: 12,
+    marginBottom: 8,
+    fontWeight: '600',
   },
 });
